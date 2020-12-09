@@ -1,33 +1,22 @@
 <?php
 
-namespace XD\Shopify\Model;
-
 use GuzzleHttp\Client;
-use SilverStripe\Assets\Folder;
-use SilverStripe\Assets\Storage\DBFile;
-use SilverStripe\Forms\ReadonlyField;
-use SilverStripe\ORM\DataObject;
-use SilverStripe\Security\Security;
-use XD\Shopify\Task\Import;
 
 /**
- * Class Image
- * @package XD\Shopify\Model
+ * Class ShopifyImage
  *
  * @property int Sort
  * @property string ShopifyID
  * @property string OriginalSrc
  *
- * @method Product Product
+ * @method ShopifyProduct Product
  */
-class Image extends \SilverStripe\Assets\Image
+class ShopifyImage extends Image
 {
-    private static $table_name = 'ShopifyImage';
-
     private static $db = [
         'Sort' => 'Int',
-        'ShopifyID' => 'Varchar',
-        'OriginalSrc' => 'Varchar'
+        'ShopifyID' => 'Varchar(255)',
+        'OriginalSrc' => 'Varchar(255)'
     ];
 
     private static $default_sort = 'Sort ASC';
@@ -42,11 +31,11 @@ class Image extends \SilverStripe\Assets\Image
     ];
 
     private static $has_one = [
-        'Product' => Product::class
+        'Product' => ShopifyProduct::class
     ];
 
     private static $has_many = [
-        'Variants' => ProductVariant::class
+        'Variants' => ShopifyProductVariant::class
     ];
 
     private static $indexes = [
@@ -70,7 +59,7 @@ class Image extends \SilverStripe\Assets\Image
      *
      * @param $shopifyImage
      * @return Image
-     * @throws \SilverStripe\ORM\ValidationException
+     * @throws ValidationException
      * @throws \GuzzleHttp\Exception\GuzzleException
      */
     public static function findOrMakeFromShopifyData($shopifyImage)
@@ -80,7 +69,7 @@ class Image extends \SilverStripe\Assets\Image
         }
 
         $map = self::config()->get('data_map');
-        Import::loop_map($map, $image, $shopifyImage);
+        ShopifyImport::loop_map($map, $image, $shopifyImage);
 
         // import the image if the source has changed
         if ($image->isChanged('OriginalSrc', DataObject::CHANGE_VALUE)) {
@@ -90,10 +79,6 @@ class Image extends \SilverStripe\Assets\Image
 
         if ($image->isChanged()) {
             $image->write();
-        }
-
-        if (!$image->isLiveVersion()) {
-            $image->publishSingle();
         }
 
         return $image;
@@ -106,21 +91,27 @@ class Image extends \SilverStripe\Assets\Image
 
     /**
      * Download the image from the shopify CDN
-     *
-     * @param $src
-     * @param $folder
-     * @throws \GuzzleHttp\Exception\GuzzleException
      */
     private function downloadImage($src, $folder)
     {
-        $client = new Client(['http_errors' => false]);
-        $request = $client->request('GET', $src);
         $folder = Folder::find_or_make($folder);
         $sourcePath = pathinfo($src);
         $fileName = explode('?', $sourcePath['basename'])[0];
-        $this->setFromString($request->getBody()->getContents(), $fileName);
-        $this->ParentID = $folder->ID;
-        $this->OwnerID = ($user = Security::getCurrentUser()) ? $user->ID : 0;
-        $this->publishFile();
+
+        $baseFolder = Director::baseFolder();
+        $relativeFilePath = $folder->Filename . $fileName;
+        $absoluteFilePath = "$baseFolder/$relativeFilePath";
+
+        $client = new Client(['http_errors' => false]);
+
+        $resource = fopen($absoluteFilePath, 'w');
+        $stream = GuzzleHttp\Psr7\stream_for($resource);
+        $client->request('GET', $src, ['save_to' => $stream]);
+        fclose($resource);
+
+        $this->setField('ParentID', $folder->ID);
+        $this->OwnerID = (Member::currentUser()) ? Member::currentUser()->ID : 0;
+        $this->setName($fileName);
+        $this->setFilename($relativeFilePath);
     }
 }

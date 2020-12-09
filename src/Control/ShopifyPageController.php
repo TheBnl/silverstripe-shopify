@@ -1,20 +1,10 @@
 <?php
 
-namespace XD\Shopify\Control;
-
-use SilverStripe\Control\HTTPRequest;
-use SilverStripe\ORM\DataObject;
-use SilverStripe\ORM\PaginatedList;
-use SilverStripe\View\Requirements;
-use XD\Shopify\Client;
-use XD\Shopify\Model\Product;
-use XD\Shopify\Model\Collection;
-
 /**
  * Class ShopifyPageController
  * @mixin ShopifyPage
  */
-class ShopifyPageController extends \PageController
+class ShopifyPageController extends Page_Controller
 {
     private static $allowed_actions = [
         'product',
@@ -27,7 +17,7 @@ class ShopifyPageController extends \PageController
     public $product;
 
     /**
-     * @var Collection
+     * @var ShopifyCollection
      */
     public $collection;
 
@@ -45,14 +35,14 @@ class ShopifyPageController extends \PageController
         )->setPageLength($this->PageLimit);
     }
 
-    public function collection(HTTPRequest $request)
+    public function collection(SS_HTTPRequest $request)
     {
         if (!$urlSegment = $request->param('ID')) {
             $this->httpError(404);
         }
 
-        /** @var Collection $collection */
-        if (!$collection = DataObject::get_one(Collection::class, ['URLSegment' => $urlSegment])) {
+        /** @var ShopifyCollection $collection */
+        if (!$collection = DataObject::get_one(ShopifyCollection::class, ['URLSegment' => $urlSegment])) {
             $this->httpError(404);
         }
 
@@ -60,7 +50,7 @@ class ShopifyPageController extends \PageController
         return $this->render($collection);
     }
 
-    public function product(HTTPRequest $request)
+    public function product(SS_HTTPRequest $request)
     {
         if (!$urlSegment = $request->param('ID')) {
             $this->httpError(404);

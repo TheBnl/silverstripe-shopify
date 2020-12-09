@@ -3,7 +3,7 @@
         <div class="cell">
             <h3>$Title</h3>
             $Content
-            <% include XD\\Shopify\\BuyButton %>
+            <% include BuyButton %>
         </div>
     </header>
 </section>

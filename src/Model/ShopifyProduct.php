@@ -1,24 +1,5 @@
 <?php
 
-namespace XD\Shopify\Model;
-
-use SilverStripe\AssetAdmin\Forms\UploadField;
-use SilverStripe\CMS\Model\SiteTree;
-use SilverStripe\Control\Controller;
-use SilverStripe\Control\Director;
-use SilverStripe\Core\Convert;
-use SilverStripe\Forms\GridField\GridField;
-use SilverStripe\Forms\GridField\GridFieldConfig_RecordViewer;
-use SilverStripe\Forms\ReadonlyField;
-use SilverStripe\ORM\DataObject;
-use SilverStripe\ORM\FieldType\DBInt;
-use SilverStripe\ORM\HasManyList;
-use SilverStripe\TagField\TagField;
-use SilverStripe\Versioned\Versioned;
-use SilverStripe\View\Requirements;
-use SilverStripe\ORM\FieldType\DBCurrency;
-use XD\Shopify\Task\Import;
-
 /**
  * Class Product
  *
@@ -37,15 +18,13 @@ use XD\Shopify\Task\Import;
  * @property string Tags
  *
  * @property int ImageID
- * @method Image Image()
+ * @method ShopifyImage Image()
  *
  * @method HasManyList Variants()
  * @method HasManyList Images()
  */
-class Product extends DataObject
+class ShopifyProduct extends DataObject
 {
-    private static $table_name = 'ShopifyProduct';
-
     private static $currency = 'EUR';
 
     private static $options = [
@@ -62,13 +41,13 @@ class Product extends DataObject
     ];
 
     private static $db = [
-        'Title' => 'Varchar',
-        'URLSegment' => 'Varchar',
-        'ShopifyID' => 'Varchar',
+        'Title' => 'Varchar(255)',
+        'URLSegment' => 'Varchar(255)',
+        'ShopifyID' => 'Varchar(255)',
         'Content' => 'HTMLText',
-        'Vendor' => 'Varchar',
-        'ProductType' => 'Varchar',
-        'Tags' => 'Varchar'
+        'Vendor' => 'Varchar(255)',
+        'ProductType' => 'Varchar(255)',
+        'Tags' => 'Varchar(255)'
     ];
 
     private static $default_sort = 'Created DESC';
@@ -96,16 +75,16 @@ class Product extends DataObject
     ];
 
     private static $has_one = [
-        'Image' => Image::class
+        'Image' => ShopifyImage::class
     ];
 
     private static $has_many = [
-        'Variants' => ProductVariant::class,
-        'Images' => Image::class
+        'Variants' => ShopifyProductVariant::class,
+        'Images' => ShopifyImage::class
     ];
 
     private static $belongs_many_many = [
-        'Collections' => Collection::class
+        'Collections' => ShopifyCollection::class
     ];
 
     private static $owns = [
@@ -163,11 +142,11 @@ class Product extends DataObject
 
     public function getVariantWithLowestPrice()
     {
-        return DataObject::get_one(ProductVariant::class, ['ProductID' => $this->ID], true, 'Price ASC');
+        return DataObject::get_one(ShopifyProductVariant::class, ['ProductID' => $this->ID], true, 'Price ASC');
     }
 
     /**
-     * @return DBCurrency|null
+     * @return Currency|null
      */
     public function getPrice()
     {
@@ -179,7 +158,7 @@ class Product extends DataObject
     }
 
     /**
-     * @return DBCurrency|null
+     * @return Currency|null
      */
     public function getCompareAtPrice()
     {
@@ -211,7 +190,7 @@ class Product extends DataObject
     public function getButtonScript()
     {
         if ($this->ShopifyID) {
-            $currencySymbol = DBCurrency::config()->get('currency_symbol');
+            $currencySymbol = Currency::config()->get('currency_symbol');
             Requirements::customScript(<<<JS
             (function () {
                 if (window.shopifyClient) {
@@ -260,7 +239,7 @@ JS
      *
      * @param $shopifyProduct
      * @return Product
-     * @throws \SilverStripe\ORM\ValidationException
+     * @throws ValidationException
      */
     public static function findOrMakeFromShopifyData($shopifyProduct)
     {
@@ -269,7 +248,7 @@ JS
         }
 
         $map = self::config()->get('data_map');
-        Import::loop_map($map, $product, $shopifyProduct);
+        ShopifyImport::loop_map($map, $product, $shopifyProduct);
 
         if ($product->isChanged()) {
             $product->write();
@@ -290,5 +269,10 @@ JS
 
     function canView($member = null) {
         return true;
+    }
+
+    function canpublish()
+    {
+        return $this->canEdit();
     }
 }

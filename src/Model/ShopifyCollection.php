@@ -1,32 +1,9 @@
 <?php
 
-namespace XD\Shopify\Model;
-
-use SilverStripe\AssetAdmin\Forms\UploadField;
-use SilverStripe\CMS\Model\SiteTree;
-use SilverStripe\Control\Controller;
-use SilverStripe\Control\Director;
-use SilverStripe\Core\Convert;
-use SilverStripe\Forms\GridField\GridField;
-use SilverStripe\Forms\GridField\GridFieldConfig_RecordViewer;
-use SilverStripe\Forms\FieldList;
-use SilverStripe\Forms\ReadonlyField;
-use SilverStripe\ORM\DataObject;
-use SilverStripe\ORM\FieldType\DBInt;
-use SilverStripe\ORM\HasManyList;
-use SilverStripe\ORM\ManyManyList;
-use SilverStripe\TagField\TagField;
-use SilverStripe\Versioned\Versioned;
-use SilverStripe\View\Requirements;
-use SilverStripe\ORM\FieldType\DBCurrency;
-use XD\Shopify\Task\Import;
-
 /**
  * Class Collection
  *
  * @author Bram de Leeuw
- * @package XD\Shopify
- * @subpackage Model
  *
  * @mixin Versioned
  *
@@ -40,14 +17,12 @@ use XD\Shopify\Task\Import;
  *
  * @method ManyManyList Products()
  */
-class Collection extends DataObject
+class ShopifyCollection extends DataObject
 {
-    private static $table_name = 'ShopifyCollection';
-
     private static $db = [
-        'Title' => 'Varchar',
-        'URLSegment' => 'Varchar',
-        'ShopifyID' => 'Varchar',
+        'Title' => 'Varchar(255)',
+        'URLSegment' => 'Varchar(255)',
+        'ShopifyID' => 'Varchar(255)',
         'Content' => 'HTMLText'
     ];
 
@@ -61,17 +36,16 @@ class Collection extends DataObject
     ];
 
     private static $has_one = [
-        'Image' => Image::class
+        'Image' => ShopifyImage::class
     ];
 
     private static $many_many = [
-        'Products' => Product::class,
+        'Products' => ShopifyProduct::class,
     ];
-
 
     private static $many_many_extraFields = [
         'Products' => [
-            'SortValue' => 'Varchar',
+            'SortValue' => 'Varchar(255)',
             'Position' => 'Int',
             'Featured' => 'Boolean',
             'Imported' => 'Boolean'
@@ -159,8 +133,8 @@ class Collection extends DataObject
      * but does not publish it
      *
      * @param $shopifyCollection
-     * @return Collection
-     * @throws \SilverStripe\ORM\ValidationException
+     * @return ShopifyCollection
+     * @throws ValidationException
      */
     public static function findOrMakeFromShopifyData($shopifyCollection)
     {
@@ -169,7 +143,7 @@ class Collection extends DataObject
         }
 
         $map = self::config()->get('data_map');
-        Import::loop_map($map, $collection, $shopifyCollection);
+        ShopifyImport::loop_map($map, $collection, $shopifyCollection);
 
         if ($collection->isChanged()) {
             $collection->write();
@@ -181,7 +155,7 @@ class Collection extends DataObject
     /**
      * @param $shopifyId
      *
-     * @return Collection
+     * @return DataObject|ShopifyCollection
      */
     public static function getByShopifyID($shopifyId)
     {

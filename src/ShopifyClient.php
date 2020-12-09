@@ -1,21 +1,12 @@
 <?php
 
-namespace XD\Shopify;
-
-use Exception;
-use SilverStripe\Control\Controller;
-use SilverStripe\Core\Config\Configurable;
-
 /**
- * Class Client
- * @package XD\Shopify
+ * Class ShopifyClient
  *
  * @author Bram de Leeuw
  */
-class Client
+class ShopifyClient extends SS_Object
 {
-    use Configurable;
-
     const EXCEPTION_NO_API_KEY = 0;
     const EXCEPTION_NO_API_PASSWORD = 1;
     const EXCEPTION_NO_DOMAIN = 2;
@@ -69,7 +60,7 @@ class Client
      * @return mixed|\Psr\Http\Message\ResponseInterface
      *
      * @throws \GuzzleHttp\Exception\GuzzleException
-     * @throws \Exception
+     * @throws Exception
      */
     public function products(array $options = [])
     {
@@ -84,7 +75,7 @@ class Client
      * @return mixed|\Psr\Http\Message\ResponseInterface
      *
      * @throws \GuzzleHttp\Exception\GuzzleException
-     * @throws \Exception
+     * @throws Exception
      */
     public function product($productId, array $options = [])
     {
@@ -130,6 +121,8 @@ class Client
      */
     public function __construct()
     {
+        parent::__construct();
+
         if (!$key = self::config()->get('api_key')) {
             throw new Exception('No api key is set.', self::EXCEPTION_NO_API_KEY);
         }
@@ -145,7 +138,7 @@ class Client
         $version = self::config()->get('api_version');
         
         $this->client = new \GuzzleHttp\Client([
-            'base_uri' => Controller::join_links(["https://$domain", 'admin/api', $version, '/']),
+            'base_uri' => Controller::join_links("https://$domain", 'admin/api', $version, '/'),
             'headers' => [
                 'Content-Type' => 'application/json; charset=utf-8',
                 'Authorization' => 'Basic ' . base64_encode("$key:$password")

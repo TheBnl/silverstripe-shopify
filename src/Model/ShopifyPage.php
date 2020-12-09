@@ -1,41 +1,29 @@
 <?php
 
-namespace XD\Shopify\Model;
-
-use SilverStripe\Forms\DropdownField;
-use SilverStripe\Forms\NumericField;
-use SilverStripe\ORM\DataObject;
-use XD\Shopify\Control\ShopifyPageController;
-
 /**
  * Class ShopifyPage
  *
  * @author Bram de Leeuw
- * @package XD\Shopify\Model
  *
  * @property int PageLimit
  * @property string ChildrenClass
  */
-class ShopifyPage extends \Page
+class ShopifyPage extends Page
 {
-    private static $table_name = 'ShopifyPage';
-
     private static $children_classes = [
-        Collection::class => 'Collections',
+        ShopifyCollection::class => 'Collections',
         Product::class => 'Products'
     ];
 
     private static $db = [
         'PageLimit' => 'Int',
-        'ChildrenClass' => 'Varchar'
+        'ChildrenClass' => 'Varchar(255)'
     ];
 
     private static $defaults = [
         'PageLimit' => 10,
-        'ChildrenClass' => Collection::class
+        'ChildrenClass' => ShopifyCollection::class
     ];
-
-    private static $controller_name = ShopifyPageController::class;
     
     public function getCMSFields()
     {

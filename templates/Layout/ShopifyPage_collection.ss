@@ -13,14 +13,14 @@
     <section class="grid-x grid-padding-x small-2 medium-up-3 large-up-4">
         <% loop $Products %>
             <div class="cell">
-                <% include XD\\Shopify\\Product %>
+                <% include ShopifyProduct %>
             </div>
         <% end_loop %>
     </section>
     <% with $ChildPages %>
         <footer class="grid-x grid-padding-x">
             <div class="cell">
-                <% include XD\\Shopify\\Pagination %>
+                <% include ShopifyPagination %>
             </div>
         </footer>
     <% end_with %>

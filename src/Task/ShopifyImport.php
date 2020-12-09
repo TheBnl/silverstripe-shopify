@@ -1,33 +1,18 @@
 <?php
 
-namespace XD\Shopify\Task;
-
-use SilverStripe\Control\Director;
-use SilverStripe\Core\Convert;
-use SilverStripe\Dev\BuildTask;
-use SilverStripe\ORM\ArrayList;
-use SilverStripe\ORM\DataObject;
-use SilverStripe\ORM\DataObjectSchema;
-use SilverStripe\ORM\DB;
-use XD\Shopify\Client;
-use XD\Shopify\Model\Collection;
-use XD\Shopify\Model\Image;
-use XD\Shopify\Model\Product;
-use XD\Shopify\Model\ProductVariant;
-
 /**
- * Class Import
+ * Class ShopifyImport
  *
  * @author Bram de Leeuw
  */
-class Import extends BuildTask
+class ShopifyImport extends BuildTask
 {
     const NOTICE = 0;
     const SUCCESS = 1;
     const WARN = 2;
     const ERROR = 3;
 
-    protected $title = 'Import shopify products';
+    protected $title = 'Shopify import products';
 
     protected $description = 'Import shopify products from the configured store';
 
@@ -38,10 +23,10 @@ class Import extends BuildTask
         if (!Director::is_cli()) echo "<pre>";
 
         try {
-            $client = new Client();
+            $client = new ShopifyClient();
         } catch (\GuzzleHttp\Exception\GuzzleException $e) {
             exit($e->getMessage());
-        } catch (\Exception $e) {
+        } catch (Exception $e) {
             exit($e->getMessage());
         }
 
@@ -61,10 +46,10 @@ class Import extends BuildTask
     /**
      * Get an array of available product ids
      *
-     * @param Client $client
+     * @param ShopifyClient $client
      * @return array
      */
-    public function getProductListingIds(Client $client)
+    public function getProductListingIds(ShopifyClient $client)
     {
         try {
             $listings = $client->productListingIds([
@@ -85,12 +70,12 @@ class Import extends BuildTask
 
     /**
      * Import the shopify products
-     * @param Client $client
+     * @param ShopifyClient $client
      * @param array $ids
      *
-     * @throws \Exception
+     * @throws Exception
      */
-    public function importProducts(Client $client, array $ids = [], $sinceId = 0)
+    public function importProducts(ShopifyClient $client, array $ids = [], $sinceId = 0)
     {
         $query = [
             'limit' => 250,
@@ -115,12 +100,12 @@ class Import extends BuildTask
             $lastId = $sinceId;
             foreach ($products->products as $shopifyProduct) {
                 // Create the product
-                if ($product = $this->importObject(Product::class, $shopifyProduct)) {
+                if ($product = $this->importObject(ShopifyProduct::class, $shopifyProduct)) {
                     // Create the images
                     $images = new ArrayList($shopifyProduct->images);
                     if ($images->exists()) {
                         foreach ($shopifyProduct->images as $shopifyImage) {
-                            if ($image = $this->importObject(Image::class, $shopifyImage)) {
+                            if ($image = $this->importObject(ShopifyImage::class, $shopifyImage)) {
                                 $product->Images()->add($image);
                             }
                         }
@@ -130,9 +115,7 @@ class Import extends BuildTask
                         $new = $images->column('id');
                         $delete = array_diff($current, $new);
                         foreach ($delete as $shopifyId) {
-                            if ($image = Image::getByShopifyID($shopifyId)) {
-                                $image->deleteFile();
-                                $image->doUnpublish();
+                            if ($image = ShopifyImage::getByShopifyID($shopifyId)) {
                                 $image->delete();
                                 self::log("[$shopifyId] Deleted image", self::SUCCESS);
                             }
@@ -140,10 +123,10 @@ class Import extends BuildTask
                     }
 
                     // attach the featured image
-                    if (($image = $shopifyProduct->image) && ($imageID = $image->id) && ($image = Image::getByShopifyID($imageID))) {
+                    if (($image = $shopifyProduct->image) && ($imageID = $image->id) && ($image = ShopifyImage::getByShopifyID($imageID))) {
                         try {
                             $product->ImageID = $image->ID;
-                        } catch (\Exception $e) {
+                        } catch (Exception $e) {
                             self::log($e->getMessage(), self::ERROR);
                         }
                     }
@@ -152,23 +135,17 @@ class Import extends BuildTask
                     if (!empty($shopifyProduct->variants)) {
                         $keepVariants = [];
                         foreach ($shopifyProduct->variants as $shopifyVariant) {
-                            if ($variant = $this->importObject(ProductVariant::class, $shopifyVariant)) {
+                            if ($variant = $this->importObject(ShopifyProductVariant::class, $shopifyVariant)) {
                                 $keepVariants[] = $variant->ID;
                                 $product->Variants()->add($variant);
-                                if (!$variant->isLiveVersion()) {
-                                    $variant->publishSingle();
-                                    self::log("[{$variant->ID}] Published Variant {$product->Title}", self::SUCCESS);
-                                } else {
-                                    self::log("[{$variant->ID}] Variant {$variant->Title} is alreaddy published", self::SUCCESS);
-                                }
+                                self::log("[{$variant->ID}] Added variant {$product->Title}", self::SUCCESS);
                             }
                         }
 
                         foreach ($product->Variants()->exclude(['ID' => $keepVariants]) as $variant) {
-                            /** @var ProductVariant $variant */
+                            /** @var ShopifyProductVariant $variant */
                             $variantId = $variant->ID;
                             $variantShopifyId = $variant->ShopifyID;
-                            $variant->doUnpublish();
                             $variant->delete();
                             self::log("[{$variantId}][{$variantShopifyId}] Deleted old variant connected to product", self::SUCCESS);
                         }
@@ -181,8 +158,8 @@ class Import extends BuildTask
                     }
 
                     // Publish the product and it's connections
-                    if (!$product->isLiveVersion()) {
-                        $product->publishSingle();
+                    if (!$product->latestPublished()) {
+                        $product->publish('Stage', 'Live', false);
                         self::log("[{$product->ID}] Published product {$product->Title}", self::SUCCESS);
                     } else {
                         self::log("[{$product->ID}] Product {$product->Title} is alreaddy published", self::SUCCESS);
@@ -203,30 +180,27 @@ class Import extends BuildTask
 
             // Cleanup old products
             $newProducts = new ArrayList($products->products);
-            $current = Product::get()->column('ShopifyID');
+            $current = ShopifyProduct::get()->column('ShopifyID');
             $new = $newProducts->column('id');
             $delete = array_diff($current, $new);
             foreach ($delete as $shopifyId) {
-                /** @var Product $product */
-                if ($product = Product::getByShopifyID($shopifyId)) {
+                /** @var ShopifyProduct $product */
+                if ($product = ShopifyProduct::getByShopifyID($shopifyId)) {
                     foreach ($product->Images() as $image) {
-                        /** @var Image $image */
+                        /** @var ShopifyImage $image */
                         $imageId = $image->ShopifyID;
-                        $image->doUnpublish();
-                        $image->deleteFile();
                         $image->delete();
                         self::log("[$shopifyId][$imageId] Deleted image connected to product", self::SUCCESS);
                     }
 
                     foreach ($product->Variants() as $variant) {
-                        /** @var ProductVariant $variant */
+                        /** @var ShopifyProductVariant $variant */
                         $variantId = $variant->ShopifyID;
-                        $variant->doUnpublish();
                         $variant->delete();
                         self::log("[$shopifyId][$variantId] Deleted variant connected to product", self::SUCCESS);
                     }
 
-                    $product->doUnpublish();
+                    $product->publish('Live', 'Stage', false);
                     $product->delete();
                     self::log("[$shopifyId] Deleted product and it's connections", self::SUCCESS);
                 }
@@ -236,11 +210,11 @@ class Import extends BuildTask
 
     /**
      * Import the SHopify Collections
-     * @param Client $client
+     * @param ShopifyClient $client
      *
-     * @throws \SilverStripe\ORM\ValidationException
+     * @throws ValidationException
      */
-    public function importCollections(Client $client, $sinceId = 0)
+    public function importCollections(ShopifyClient $client, $sinceId = 0)
     {
         try {
             $collections = $client->collections([
@@ -257,7 +231,7 @@ class Import extends BuildTask
             $lastId = $sinceId;
             foreach ($collections->custom_collections as $shopifyCollection) {
                 // Create the collection
-                if ($collection = $this->importObject(Collection::class, $shopifyCollection)) {
+                if ($collection = $this->importObject(ShopifyCollection::class, $shopifyCollection)) {
                     // Create the images
                     if (!empty($shopifyCollection->image)) {
                         // The collection image does not have an id so set it from the scr to prevent double importing the image
@@ -273,8 +247,8 @@ class Import extends BuildTask
                         }
                     }
 
-                    if (!$collection->isLiveVersion()) {
-                        $collection->publishSingle();
+                    if (!$collection->latestPublished()) {
+                        $collection->publish('Stage', 'Live', false);
                         self::log("[{$collection->ID}] Published collection {$collection->Title} and it's connections", self::SUCCESS);
                     } else {
                         self::log("[{$collection->ID}] Collection {$collection->Title} is alreaddy published", self::SUCCESS);
@@ -294,11 +268,11 @@ class Import extends BuildTask
 
     /**
      * Import the Shopify Collects
-     * @param Client $client
+     * @param ShopifyClient $client
      *
-     * @throws \SilverStripe\ORM\ValidationException
+     * @throws ValidationException
      */
-    public function importCollects(Client $client, $sinceId = 0)
+    public function importCollects(ShopifyClient $client, $sinceId = 0)
     {
         try {
             $collects = $client->collects([
@@ -315,8 +289,8 @@ class Import extends BuildTask
             $lastId = $sinceId;
             foreach ($collects->collects as $shopifyCollect) {
                 if (
-                    ($collection = Collection::getByShopifyID($shopifyCollect->collection_id))
-                    && ($product = Product::getByShopifyID($shopifyCollect->product_id))
+                    ($collection = ShopifyCollection::getByShopifyID($shopifyCollect->collection_id))
+                    && ($product = ShopifyProduct::getByShopifyID($shopifyCollect->product_id))
                 ) {
                     $collection->Products()->add($product, [
                         'ShopifyID' => $shopifyCollect->id,
@@ -342,27 +316,20 @@ class Import extends BuildTask
     public function beforeImportCollects()
     {
         // Set all imported values to 0
-        $schema = DataObject::getSchema()->manyManyComponent(Collection::class, 'Products');
-        if (isset($schema['join']) && $join = $schema['join']) {
-            DB::query("UPDATE `$join` SET `Imported` = 0 WHERE 1");
-        }
+        DB::query("UPDATE `ShopifyCollection_Products` SET `Imported` = 0 WHERE 1");
     }
 
     public function afterImportCollects()
     {
-        // Delete all collects that where not given during importe
-        $schema = DataObject::getSchema()->manyManyComponent(Collection::class, 'Products');
-        if (isset($schema['join']) && $join = $schema['join']) {
-            DB::query("DELETE FROM `$join` WHERE `Imported` = 0");
-        }
+        DB::query("DELETE FROM `ShopifyCollection_Products` WHERE `Imported` = 0");
     }
 
     /**
      * Import the base product
      *
-     * @param Product|ProductVariant|Image|string $class
+     * @param ShopifyProduct|ShopifyProductVariant|ShopifyImage|string $class
      * @param $shopifyData
-     * @return null|Product|ProductVariant|Image
+     * @return null|ShopifyProduct|ShopifyProductVariant|ShopifyImage
      */
     private function importObject($class, $shopifyData)
     {
@@ -370,7 +337,7 @@ class Import extends BuildTask
         try {
             $object = $class::findOrMakeFromShopifyData($shopifyData);
             self::log("[{$object->ID}] Created {$class} {$object->Title}", self::SUCCESS);
-        } catch (\Exception $e) {
+        } catch (Exception $e) {
             self::log($e->getMessage(), self::ERROR);
         } catch (\GuzzleHttp\Exception\GuzzleException $e) {
             self::log("[Guzzle error] {$e->getMessage()}", self::ERROR);

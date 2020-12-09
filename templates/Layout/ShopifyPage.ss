@@ -12,7 +12,7 @@
                 <% loop $ChildPages %>
                     <div class="cell">
                         <% if $ClassName == 'XD\Shopify\Model\Product' %>
-                            <% include XD\\Shopify\\Product %>
+                            <% include ShopifyProduct %>
                         <% else_if $ClassName == 'XD\Shopify\Model\Collection' %>
                             <a href="$Link">Collection: $Title</a>
                         <% end_if %>
@@ -22,7 +22,7 @@
             <% with $ChildPages %>
                 <div class="grid-x grid-padding-x">
                     <div class="cell">
-                        <% include XD\\Shopify\\Pagination %>
+                        <% include ShopifyPagination %>
                     </div>
                 </div>
             <% end_with %>

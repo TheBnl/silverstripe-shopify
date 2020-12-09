@@ -1,17 +1,9 @@
 <?php
 
-namespace XD\Shopify\Model;
-
-use SilverStripe\Forms\ReadonlyField;
-use SilverStripe\ORM\DataObject;
-use SilverStripe\Versioned\Versioned;
-use XD\Shopify\Task\Import;
-
 /**
  * Class ProductVariant
  *
  * @author Bram de Leeuw
- * @package XD\Shopify\Model
  *
  * @property string Title
  * @property string ShopifyID
@@ -32,31 +24,29 @@ use XD\Shopify\Task\Import;
  * @property boolean RequiresShipping
  *
  * @property int ProductID
- * @method Product Product()
+ * @method ShopifyProduct Product()
  * @property int ImageID
- * @method Image Image()
+ * @method ShopifyImage Image()
  */
-class ProductVariant extends DataObject
+class ShopifyProductVariant extends DataObject
 {
-    private static $table_name = 'ShopifyProductVariant';
-
     private static $db = [
-        'Title' => 'Varchar',
-        'ShopifyID' => 'Varchar',
+        'Title' => 'Varchar(255)',
+        'ShopifyID' => 'Varchar(255)',
         'Price' => 'Currency',
         'CompareAtPrice' => 'Currency',
-        'SKU' => 'Varchar',
+        'SKU' => 'Varchar(255)',
         'Sort' => 'Int',
-        'Option1' => 'Varchar',
-        'Option2' => 'Varchar',
-        'Option3' => 'Varchar',
+        'Option1' => 'Varchar(255)',
+        'Option2' => 'Varchar(255)',
+        'Option3' => 'Varchar(255)',
         'Taxable' => 'Boolean',
-        'Barcode' => 'Varchar',
+        'Barcode' => 'Varchar(255)',
         'Inventory' => 'Int',
         'Grams' => 'Int',
         'Weight' => 'Decimal',
-        'WeightUnit' => 'Varchar',
-        'InventoryItemID' => 'Varchar',
+        'WeightUnit' => 'Varchar(255)',
+        'InventoryItemID' => 'Varchar(255)',
         'RequiresShipping' => 'Boolean'
     ];
 
@@ -83,12 +73,8 @@ class ProductVariant extends DataObject
     ];
 
     private static $has_one = [
-        'Product' => Product::class,
-        'Image' => Image::class
-    ];
-
-    private static $extensions = [
-        Versioned::class
+        'Product' => ShopifyProduct::class,
+        'Image' => ShopifyImage::class
     ];
 
     private static $indexes = [
@@ -114,8 +100,8 @@ class ProductVariant extends DataObject
      * Creates a new Shopify Variant from the given data
      *
      * @param $shopifyVariant
-     * @return ProductVariant
-     * @throws \SilverStripe\ORM\ValidationException
+     * @return ShopifyProductVariant
+     * @throws ValidationException
      */
     public static function findOrMakeFromShopifyData($shopifyVariant)
     {
@@ -124,9 +110,9 @@ class ProductVariant extends DataObject
         }
 
         $map = self::config()->get('data_map');
-        Import::loop_map($map, $variant, $shopifyVariant);
+        ShopifyImport::loop_map($map, $variant, $shopifyVariant);
 
-        if ($image = Image::getByShopifyID($shopifyVariant->image_id)) {
+        if ($image = ShopifyImage::getByShopifyID($shopifyVariant->image_id)) {
             $variant->ImageID = $image->ID;
         }
 
@@ -157,8 +143,8 @@ class ProductVariant extends DataObject
         return $this->Product()->canDelete($member);
     }
 
-    public function canCreate($member = null, $context = [])
+    public function canCreate($member = null)
     {
-        return $this->Product()->canCreate($member, $context);
+        return $this->Product()->canCreate($member);
     }
 }

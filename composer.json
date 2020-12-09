@@ -1,7 +1,7 @@
 {
 	"name": "xddesigners/silverstripe-shopify",
 	"description": "Import Shopify products into your Silverstripe site, implements the buy button sdk to create a cart and checkout",
-	"type": "silverstripe-vendormodule",
+	"type": "silverstripe-module",
 	"keywords": ["silverstripe", "shopify", "buybutton"],
 	"license": "BSD-3-Clause",
 	"authors": [
@@ -15,13 +15,7 @@
 		}
 	],
 	"require": {
-		"silverstripe/framework": "4.x",
-		"composer/installers": "*",
+		"silverstripe/framework": "3.x",
 		"guzzlehttp/guzzle": "*"
-	},
-	"autoload": {
-		"psr-4": {
-			"XD\\Shopify\\": "src"
-		}
 	}
 }
